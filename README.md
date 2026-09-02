@@ -17,6 +17,14 @@ The goal of this service is to eliminate Tier 1 manual triage toil and reduce th
 *   **Environment Variable Security:** API keys are injected dynamically via environment variables during runtime.
 
 ---
+##  My Development Setup
+I built and tested this environment locally before deploying to the cloud. 
+* **OS:** Arch Linux (with HyDE / Hyprland)
+* **Package Manager:** `paru`
+* **Language:** Python 3 (Flask, Requests)
+* **Testing:** Postman & `curl` natively in the Kitty/Foot terminal
+* **APIs:** VirusTotal (v3) & AbuseIPDB (v2)
+---
 
 ## Installation & Setup
 
@@ -24,5 +32,209 @@ The goal of this service is to eliminate Tier 1 manual triage toil and reduce th
 1.  **Python 3.x** installed on your system.
 2.  **API Keys:** Free accounts and API keys from [VirusTotal](https://www.virustotal.com/) and [AbuseIPDB](https://www.abuseipdb.com/).
 3.  **Testing Tool:** `curl` or Postman to simulate SIEM webhooks.
+---
 
-git clone [https://github.com/YOUR_USERNAME/sentinel-enricher.git](https://github.com/YOUR_USERNAME/sentinel-enricher.git)cd sentinel-enricher
+**1. Install Dependencies**
+
+You can install the required packages (flask and requests) using a Python virtual environment, or via your system's package manager.
+
+Arch Linux (Native Packages via paru)
+If you are running Arch Linux and enforce PEP 668 (externally-managed environments), you can install the dependencies directly via paru or pacman:
+```
+paru -S python-flask python-requests
+```
+(For Debian/Ubuntu or macOS, you can use ```python -m venv venv && pip install flask requests)```
+
+**2.Get Your API Key**
+
+Log in to VirusTotal and AbuseIPdb and get ready with your both API keys
+
+**3. Install Postman**
+
+```
+paru -S postman-bin
+```
+
+***4. Project Directory & app.py***
+
+Create a clean workspace somewhere and create a python file and paste the code shown as below: 
+
+```
+import os
+import ipaddress
+import requests
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+# Pull both keys from environment variables
+VT_API_KEY = os.environ.get("VT_API_KEY", "YOUR_VT_KEY")
+ABUSEIPDB_API_KEY = os.environ.get("ABUSEIPDB_API_KEY", "YOUR_ABUSEIPDB_KEY")
+
+def is_public_ip(ip_str):
+    """OPSEC Check: Ensure RFC 1918 / loopback / private IPs are not leaked."""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return ip.is_global
+    except ValueError:
+        return False
+
+def check_virustotal(ip):
+    """Queries VirusTotal and returns the malicious score."""
+    url = f"https://www.virustotal.com/api/v3/ip_addresses/{ip}"
+    headers = {"x-apikey": VT_API_KEY}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            stats = response.json().get('data', {}).get('attributes', {}).get('last_analysis_stats', {})
+            malicious = stats.get('malicious', 0)
+            total = sum(stats.values())
+            return f"{malicious}/{total} engines detected"
+        return f"VT Error {response.status_code}"
+    except requests.RequestException as e:
+        return f"Error: {str(e)}"
+
+def check_abuseipdb(ip):
+    """Queries AbuseIPDB and returns the abuse confidence score."""
+    url = "https://api.abuseipdb.com/api/v2/check"
+    querystring = {
+        'ipAddress': ip,
+        'maxAgeInDays': '90' # Looks back at the last 90 days of reports
+    }
+    headers = {
+        'Accept': 'application/json',
+        'Key': ABUSEIPDB_API_KEY
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, params=querystring, timeout=10)
+        if response.status_code == 200:
+            data = response.json()['data']
+            score = data.get('abuseConfidenceScore', 0)
+            return f"{score}% confidence of abuse"
+        return f"AbuseIPDB Error {response.status_code}"
+    except requests.RequestException as e:
+        return f"Error: {str(e)}"
+
+@app.route('/api/sentinel-webhook', methods=['POST'])
+def sentinel_webhook():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid JSON payload"}), 400
+
+    entities = data.get("Entities", [])
+    target_ips = [
+        entity["Address"]
+        for entity in entities
+        if entity.get("Type", "").lower() == "ip" and "Address" in entity
+    ]
+
+    if not target_ips:
+        return jsonify({"message": "No IP addresses found."}), 200
+
+    results = []
+
+    for ip in target_ips:
+        if not is_public_ip(ip):
+            print(f"[\033[93mOPSEC BLOCKED\033[0m] {ip} is private/internal. Will not route to APIs.")
+            results.append({"ip": ip, "status": "Internal IP - Ignored"})
+            continue
+
+        print(f"[\033[94mQUERY\033[0m] Checking VirusTotal and AbuseIPDB for {ip}...")
+        
+        # Fire both API queries
+        vt_result = check_virustotal(ip)
+        abuse_result = check_abuseipdb(ip)
+
+        print(f"[\033[91mALERT\033[0m] IP: {ip} | VT: {vt_result} | AbuseIPDB: {abuse_result}")
+        results.append({
+            "ip": ip, 
+            "virustotal": vt_result,
+            "abuseipdb": abuse_result
+        })
+
+    return jsonify({"status": "success", "data": results}), 200
+
+if __name__ == '__main__':
+    print("\033[92m[*] SOC Webhook Listener running on http://127.0.0.1:5000\033[0m")
+    app.run(host="127.0.0.1", port=5000, debug=True)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
