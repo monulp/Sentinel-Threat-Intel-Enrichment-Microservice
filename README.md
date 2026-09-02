@@ -161,9 +161,49 @@ if __name__ == '__main__':
     app.run(host="127.0.0.1", port=5000, debug=True)
 ```
 
+---
 
+## TESTING
 
+**1. Start the Microservice**
 
+Get your free API keys from VirusTotal and AbuseIPDB. Inject them into your terminal as environment variables so you don't hardcode secrets, and run the script:
+
+```
+VT_API_KEY="your_vt_key" ABUSEIPDB_API_KEY="your_abuse_key" python app.py
+```
+
+**2.Simulate a SIEM Alert**
+
+Using postman:
+
+- Create a HTTP request
+- Change GET to POST in the dropdown.
+- Paste the URL: ```http://127.0.0.1:5000/api/sentinel-webhook```
+- Click the Body tab.
+- Select raw.
+- Paste the mock Sentinel JSON payload:
+```
+{
+  "IncidentTitle": "Suspicious Login Attempt from Malicious IP",
+  "Severity": "High",
+  "Entities": [
+    {
+      "Type": "ip",
+      "Address": "192.168.1.50"
+    },
+    {
+      "Type": "ip",
+      "Address": "143.110.232.223"
+    }
+  ]
+}
+```
+-Hit send to watch the listening terminal to populate the output.
+
+**3. Expected Output**
+
+Your Flask server terminal will immediately block the internal IP for OPSEC reasons, and return the threat intel scores for the external IP
 
 
 
