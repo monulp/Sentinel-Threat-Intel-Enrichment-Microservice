@@ -25,6 +25,4 @@ The goal of this service is to eliminate Tier 1 manual triage toil and reduce th
 2.  **API Keys:** Free accounts and API keys from [VirusTotal](https://www.virustotal.com/) and [AbuseIPDB](https://www.abuseipdb.com/).
 3.  **Testing Tool:** `curl` or Postman to simulate SIEM webhooks.
 
-```bash
-git clone [https://github.com/YOUR_USERNAME/sentinel-enricher.git](https://github.com/YOUR_USERNAME/sentinel-enricher.git)
-cd sentinel-enricher
+git clone [https://github.com/YOUR_USERNAME/sentinel-enricher.git](https://github.com/YOUR_USERNAME/sentinel-enricher.git)cd sentinel-enricher
